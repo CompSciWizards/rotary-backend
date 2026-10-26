@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from __init__ import app, db, login_manager  # Key Flask objects 
 from model.persona import Persona, initPersonas, initPersonaUsers
 from model.presence_schedule import seed_schedules
+from model.rotary_event import RotaryEvent, initRotaryEvents
 # API endpoints
 from api.user import user_api 
 from api.python_exec_api import python_exec_api
@@ -35,6 +36,7 @@ from api.profile_game import profile_game_api  # CS Pathway Game profile persist
 from api.snapshot_proxy import snapshot_proxy
 from api.rfid_api import rfid_api
 from api.presence_api import presence_api
+from api.rotary_events_api import rotary_events_api
 #from api.announcement import announcement_api ##temporary revert
 
 # database Initialization functions
@@ -93,11 +95,14 @@ app.register_blueprint(profile_game_api)  # CS Pathway Game profile persistence
 app.register_blueprint(snapshot_proxy)  # Register the snapshot proxy API
 app.register_blueprint(rfid_api)  # Register the RFID attendance API
 app.register_blueprint(presence_api)  # Register the generic presence event API
+app.register_blueprint(rotary_events_api)  # Register the Rotary upcoming events API
 # app.register_blueprint(announcement_api) ##temporary revert
 
 # Jokes file initialization
 with app.app_context():
     initJokes()
+
+initRotaryEvents()
 
 # Tell Flask-Login the view function name of your login route
 login_manager.login_view = "login"
@@ -273,6 +278,7 @@ def generate_data():
     initMicroblogs()
     initPersonas()
     initPersonaUsers()
+    initRotaryEvents()
     seed_schedules()  # presence schedules from model/presence_schedules.json
 
 # Register the custom command group with the Flask application
