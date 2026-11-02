@@ -1,0 +1,65 @@
+# Upcoming events (api/rotary_events_api.py): the homepage list plus the Admin
+# add/delete endpoints. Send each numbered request top to bottom and check the
+# status in its heading. Creates real rows in the selected database.
+#
+# The public GET is the only request that works logged out; POST and DELETE
+# answer 401 without a session and 403 for a non-Admin, so log in first.
+
+### 1. Authenticate as an Admin (expect 200)
+# @name login
+# @prompt uid Enter an Admin user ID
+# @prompt password Enter that account's password
+POST {{baseUrl}}/api/authenticate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "uid": "{{uid}}",
+  "password": "{{password}}"
+}
+
+### 2. List events (expect 200 and an array ordered by date)
+GET {{baseUrl}}/api/rotary/events
+Accept: application/json
+
+### 3. Add an event (expect 201 and the new event's id)
+# @name createEvent
+POST {{baseUrl}}/api/rotary/events
+Content-Type: application/json
+Accept: application/json
+
+{
+  "date": "2026-12-10",
+  "program": "Holiday Potluck",
+  "speaker": "Club Social"
+}
+
+### 4. Reject a non-ISO date (expect 400 and an errors list)
+POST {{baseUrl}}/api/rotary/events
+Content-Type: application/json
+Accept: application/json
+
+{
+  "date": "Dec 10",
+  "program": "Holiday Potluck",
+  "speaker": "Club Social"
+}
+
+### 5. Reject a blank program (expect 400)
+POST {{baseUrl}}/api/rotary/events
+Content-Type: application/json
+Accept: application/json
+
+{
+  "date": "2026-12-10",
+  "program": "   ",
+  "speaker": "Club Social"
+}
+
+### 6. Delete the event from step 3 (expect 200 and the deleted event)
+DELETE {{baseUrl}}/api/rotary/events/{{createEvent.response.body.$.id}}
+Accept: application/json
+
+### 7. Delete it again (expect 404)
+DELETE {{baseUrl}}/api/rotary/events/{{createEvent.response.body.$.id}}
+Accept: application/json

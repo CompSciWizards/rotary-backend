@@ -278,7 +278,7 @@ def generate_data():
     initMicroblogs()
     initPersonas()
     initPersonaUsers()
-    initRotaryEvents()
+    initRotaryEvents(seed=True)  # this command rebuilds the schema, so force the samples in
     seed_schedules()  # presence schedules from model/presence_schedules.json
 
 # Register the custom command group with the Flask application

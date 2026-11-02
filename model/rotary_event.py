@@ -1,24 +1,79 @@
-from datetime import datetime
-from sqlite3 import IntegrityError
+"""Events shown in the homepage's upcoming-events list.
+
+Anyone may read them (see api/rotary_events_api.py); only an Admin may add or
+delete one. Dates are stored as real dates and travel as ISO `YYYY-MM-DD`, so
+the database can order and filter by them instead of relying on a hand-kept
+sort column.
+"""
+
+from datetime import date, datetime
+
+from sqlalchemy import inspect
+from sqlalchemy.exc import IntegrityError
 
 from __init__ import app, db
+
+# Matches the _program / _speaker column widths.
+MAX_TEXT = 255
+
+
+def parse_event_date(value):
+    """A `YYYY-MM-DD` string (what the frontend sends) -> (date, None), or
+    (None, message) when it is missing or not an ISO date."""
+    if isinstance(value, datetime):
+        return value.date(), None
+    if isinstance(value, date):
+        return value, None
+    if not isinstance(value, str) or not value.strip():
+        return None, "date is required, as YYYY-MM-DD"
+    raw = value.strip()
+    try:
+        return date.fromisoformat(raw), None
+    except ValueError:
+        return None, f"date must be YYYY-MM-DD, got {raw!r}"
+
+
+def validate_event(data):
+    """Validation shared by the create endpoint and the seed below.
+
+    Returns (fields, errors): fields is ready to splat into RotaryEvent(),
+    errors is a list of human-readable problems (empty when valid).
+    """
+    fields, errors = {}, []
+
+    parsed, date_error = parse_event_date(data.get("date"))
+    if date_error:
+        errors.append(date_error)
+    else:
+        fields["date"] = parsed
+
+    for name in ("program", "speaker"):
+        value = data.get(name)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{name} is required")
+            continue
+        value = value.strip()
+        if len(value) > MAX_TEXT:
+            errors.append(f"{name} must be at most {MAX_TEXT} characters")
+            continue
+        fields[name] = value
+
+    return fields, errors
 
 
 class RotaryEvent(db.Model):
     __tablename__ = 'rotary_events'
 
     id = db.Column(db.Integer, primary_key=True)
-    _date = db.Column(db.String(100), nullable=False)
-    _program = db.Column(db.String(255), nullable=False)
-    _speaker = db.Column(db.String(255), nullable=False)
-    _sort_order = db.Column(db.Integer, nullable=False, default=0)
+    _date = db.Column(db.Date, nullable=False)
+    _program = db.Column(db.String(MAX_TEXT), nullable=False)
+    _speaker = db.Column(db.String(MAX_TEXT), nullable=False)
     _created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-    def __init__(self, date, program, speaker, sort_order=0):
+    def __init__(self, date, program, speaker):
         self._date = date
         self._program = program
         self._speaker = speaker
-        self._sort_order = sort_order
 
     def create(self):
         try:
@@ -29,43 +84,64 @@ class RotaryEvent(db.Model):
             db.session.rollback()
             return None
 
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
     def read(self):
         return {
             'id': self.id,
-            'date': self._date,
+            'date': self._date.isoformat(),
             'program': self._program,
             'speaker': self._speaker,
         }
 
     @staticmethod
+    def find(event_id):
+        return db.session.get(RotaryEvent, event_id) if isinstance(event_id, int) else None
+
+    @staticmethod
     def get_all():
+        """Soonest first; the homepage depends on the order."""
         return RotaryEvent.query.order_by(
-            RotaryEvent._sort_order.asc(),
+            RotaryEvent._date.asc(),
             RotaryEvent.id.asc(),
         ).all()
 
 
+# Dates are deliberately in the near future so a fresh database has a sensible
+# upcoming list to demo; an Admin can add or delete from here on.
 SAMPLE_EVENTS = [
-    ('Sept 12, Sat', 'Poway Rotary Parade, 9-11 AM on Poway Road', 'Community Event'),
-    ('Sept 16', "Robin's Nest Rescue", 'Jenny Ng'),
-    ('Sept 23', 'Special Needs Support', 'Tony Rubino'),
-    ('Nov 26', 'San Diego Blood Bank Drive', 'Service Project'),
+    {'date': '2026-11-12', 'program': 'Poway Rotary Parade, 9-11 AM on Poway Road',
+     'speaker': 'Community Event'},
+    {'date': '2026-11-19', 'program': "Robin's Nest Rescue", 'speaker': 'Jenny Ng'},
+    {'date': '2026-11-26', 'program': 'Special Needs Support', 'speaker': 'Tony Rubino'},
+    {'date': '2026-12-03', 'program': 'San Diego Blood Bank Drive', 'speaker': 'Service Project'},
 ]
 
 
-def initRotaryEvents():
-    with app.app_context():
-        RotaryEvent.__table__.create(bind=db.engine, checkfirst=True)
+def initRotaryEvents(seed=False):
+    """Create the table on a new database, and seed it on the run that creates it.
 
-        if RotaryEvent.query.first():
+    Seeding is tied to the table being created, not to it being empty: once an
+    Admin has deleted every event, a restart must not bring the samples back.
+
+    seed=True is for the data-generation path (scripts/db_init.py, `flask custom
+    generate_data`), which runs db.create_all() itself -- so the table already
+    exists by the time this is called and would otherwise stay empty.
+    """
+    with app.app_context():
+        table_created = not inspect(db.engine).has_table('rotary_events')
+        RotaryEvent.__table__.create(bind=db.engine, checkfirst=True)
+        if not (table_created or seed):
+            return
+        if RotaryEvent.query.first():  # never duplicate rows
             return
 
-        for sort_order, (date, program, speaker) in enumerate(SAMPLE_EVENTS):
-            db.session.add(RotaryEvent(
-                date=date,
-                program=program,
-                speaker=speaker,
-                sort_order=sort_order,
-            ))
+        for sample in SAMPLE_EVENTS:
+            fields, errors = validate_event(sample)
+            if errors:  # a typo in the samples above, surfaced at startup
+                raise ValueError(f"SAMPLE_EVENTS entry {sample!r}: {'; '.join(errors)}")
+            db.session.add(RotaryEvent(**fields))
 
         db.session.commit()
