@@ -109,14 +109,21 @@ class RotaryEvent(db.Model):
         ).all()
 
 
+# PowPAC's current mainstage run (The Wisdom of Eve, Nov 13 - Dec 13, 2026) plus the
+# 2027 season announcement, matching the shows already described on the homepage.
 # Dates are deliberately in the near future so a fresh database has a sensible
 # upcoming list to demo; an Admin can add or delete from here on.
 SAMPLE_EVENTS = [
-    {'date': '2026-11-12', 'program': 'Poway Rotary Parade, 9-11 AM on Poway Road',
-     'speaker': 'Community Event'},
-    {'date': '2026-11-19', 'program': "Robin's Nest Rescue", 'speaker': 'Jenny Ng'},
-    {'date': '2026-11-26', 'program': 'Special Needs Support', 'speaker': 'Tony Rubino'},
-    {'date': '2026-12-03', 'program': 'San Diego Blood Bank Drive', 'speaker': 'Service Project'},
+    {'date': '2026-11-13', 'program': 'The Wisdom of Eve - Opening Night',
+     'speaker': 'Cast of The Wisdom of Eve'},
+    {'date': '2026-11-21', 'program': 'The Wisdom of Eve - Saturday Matinee, 2:00 PM',
+     'speaker': 'Cast of The Wisdom of Eve'},
+    {'date': '2026-12-05', 'program': 'The Wisdom of Eve - Saturday Matinee, 2:00 PM',
+     'speaker': 'Cast of The Wisdom of Eve'},
+    {'date': '2026-12-13', 'program': 'The Wisdom of Eve - Closing Performance, 2:00 PM',
+     'speaker': 'Cast of The Wisdom of Eve'},
+    {'date': '2027-01-15', 'program': 'Season 45 - 2027 Season Announcement',
+     'speaker': 'PowPAC Board'},
 ]
 
 
